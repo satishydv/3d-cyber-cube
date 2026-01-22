@@ -1,9 +1,64 @@
+/**
+ * PROCEDURAL TEXTURE GENERATION
+ * 
+ * This module generates all cube face textures at runtime using HTML5 Canvas.
+ * No image files are required - everything is drawn procedurally.
+ * 
+ * BENEFITS OF PROCEDURAL GENERATION:
+ * - Zero network requests (no texture downloads)
+ * - Smaller bundle size (code vs. images)
+ * - Infinite variations possible
+ * - Consistent quality at any resolution
+ * - Theme switching with no reload
+ * 
+ * TEXTURE CACHING:
+ * All textures are cached after first generation. The cache key includes
+ * theme version numbers, so updating a theme automatically invalidates its cache.
+ * 
+ * THEMES IMPLEMENTED:
+ * 1. CLASSIC (TECH) - Standard Rubik's Cube stickers with rounded corners
+ * 2. SKETCH - Hand-drawn appearance with marker strokes and wobbles
+ * 3. NEON - Futuristic holographic grid with glowing concentric rectangles
+ * 4. ANIME - Domain Expansion style with radial rays and hexagonal patterns
+ * 5. DEV - Developer-themed with technology logos (React, Three.js, etc.)
+ * 
+ * CANVAS DRAWING TECHNIQUES:
+ * - Context 2D API for vector graphics
+ * - Gradients for depth and lighting
+ * - Shadow effects for glow (neon theme)
+ * - Bezier curves for smooth shapes
+ * - Path2D operations for complex forms
+ * - Quadratic curves for rounded corners
+ */
+
 import * as THREE from 'three';
 import { COLORS } from './cubeMath';
 
+/**
+ * textureCache: Stores generated textures to avoid redundant generation
+ * 
+ * Key format: "THEME-VERSION-COLOR"
+ * Example: "CLASSIC-V6-#C41E3A" (Classic theme, version 6, red color)
+ * 
+ * Version numbers in keys allow controlled cache invalidation when themes are updated.
+ */
 const textureCache: Record<string, THREE.CanvasTexture> = {};
 
-// --- HELPER: Draw Rounded Rect manually for max compatibility ---
+/**
+ * HELPER FUNCTIONS FOR CANVAS DRAWING
+ */
+
+/**
+ * drawRoundedRect: Draws a rectangle with rounded corners
+ * 
+ * HTML5 Canvas doesn't have a built-in roundRect (in older browsers),
+ * so we construct it manually using quadraticCurveTo for each corner.
+ * 
+ * @param ctx - Canvas 2D context
+ * @param x, y - Top-left corner position
+ * @param w, h - Width and height
+ * @param r - Corner radius in pixels
+ */
 const drawRoundedRect = (ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) => {
     ctx.beginPath();
     ctx.moveTo(x + r, y);
@@ -18,6 +73,11 @@ const drawRoundedRect = (ctx: CanvasRenderingContext2D, x: number, y: number, w:
     ctx.closePath();
 };
 
+/**
+ * drawLine: Draws a line with optional wobble for hand-drawn effect
+ * 
+ * @param wobble - Random deviation amount for sketch aesthetic
+ */
 const drawLine = (ctx: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number, wobble: number = 1) => {
     ctx.beginPath();
     ctx.moveTo(x1, y1);
@@ -25,6 +85,11 @@ const drawLine = (ctx: CanvasRenderingContext2D, x1: number, y1: number, x2: num
     ctx.stroke();
 };
 
+/**
+ * drawWobblyRect: Draws a rectangle with imperfect corners for sketch style
+ * 
+ * Adds random offset to each corner to simulate hand-drawing imperfection.
+ */
 const drawWobblyRect = (ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, wobble: number = 2) => {
     ctx.beginPath();
     ctx.moveTo(x + Math.random() * wobble, y + Math.random() * wobble);
@@ -34,11 +99,24 @@ const drawWobblyRect = (ctx: CanvasRenderingContext2D, x: number, y: number, w: 
     ctx.closePath();
 };
 
+/**
+ * CLASSIC THEME GENERATOR
+ * 
+ * Generates traditional Rubik's Cube stickers with:
+ * - Black background (gap between stickers)
+ * - Solid color rounded rectangle (the sticker)
+ * - High-quality antialiasing
+ * 
+ * Design matches standard speedcube appearance with WCA colors.
+ * 
+ * @param baseColor - WCA color code (e.g., COLORS.R for red)
+ * @returns Three.js CanvasTexture ready for use as material map
+ */
 export const generateClassicSticker = (baseColor: string): THREE.CanvasTexture => {
   const cacheKey = `CLASSIC-V6-${baseColor}`;
   if (textureCache[cacheKey]) return textureCache[cacheKey];
 
-  const size = 1024;
+  const size = 1024; // High resolution for quality
   const canvas = document.createElement('canvas');
   canvas.width = size;
   canvas.height = size;
@@ -46,9 +124,11 @@ export const generateClassicSticker = (baseColor: string): THREE.CanvasTexture =
   
   if (!ctx) return new THREE.CanvasTexture(canvas);
 
+  // Black background (represents gap between stickers)
   ctx.fillStyle = '#000000'; 
   ctx.fillRect(0, 0, size, size);
 
+  // Calculate sticker dimensions with padding
   const padding = 80; 
   const cornerRadius = 50; 
   const x = padding;
@@ -56,13 +136,15 @@ export const generateClassicSticker = (baseColor: string): THREE.CanvasTexture =
   const w = size - (padding * 2);
   const h = size - (padding * 2);
 
+  // Draw colored sticker
   ctx.fillStyle = baseColor;
   drawRoundedRect(ctx, x, y, w, h, cornerRadius);
   ctx.fill();
 
+  // Convert canvas to Three.js texture
   const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.anisotropy = 16; 
+  texture.colorSpace = THREE.SRGBColorSpace; // Correct color interpretation
+  texture.anisotropy = 16; // High-quality filtering for angular viewing
   textureCache[cacheKey] = texture;
   return texture;
 };
